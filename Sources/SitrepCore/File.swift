@@ -26,7 +26,11 @@ struct File {
 
         let sourceFile = try SyntaxParser.parse(url)
         results = FileVisitor()
+        #if swift(>=5.2)
+        results.walk(sourceFile)
+        #else
         sourceFile.walk(&results)
+        #endif
     }
 
     /// Creates an instance of the scanner from a string, then starts it walking through code
@@ -35,7 +39,11 @@ struct File {
         results = FileVisitor()
 
         let sourceFile = try SyntaxParser.parse(source: sourceCode)
+        #if swift(>=5.2)
+        results.walk(sourceFile)
+        #else
         sourceFile.walk(&results)
+        #endif
     }
 
     /// Writes this file's tree to a JSON string for testing
