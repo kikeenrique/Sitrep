@@ -36,44 +36,90 @@ class FileVisitor: SyntaxVisitor {
     }()
 
     /// Triggered on entering a class
+    #if swift(>=5.2)
     override func visit(_ node: ClassDeclSyntax) -> SyntaxVisitorContinueKind {
         create(.class, from: node)
         return .visitChildren
     }
+    #else
+    func visit(_ node: ClassDeclSyntax) -> SyntaxVisitorContinueKind {
+        create(.class, from: node)
+        return .visitChildren
+    }
+    #endif
 
     /// Triggered on exiting a class; moves back up the tree
+    #if swift(>=5.2)
     override func visitPost(_ node: ClassDeclSyntax) {
         current = current?.parent
     }
+    #else
+    func visitPost(_ node: ClassDeclSyntax) {
+        current = current?.parent
+    }
+    #endif
 
     /// Triggered on entering an enum
+    #if swift(>=5.2)
     override func visit(_ node: EnumDeclSyntax) -> SyntaxVisitorContinueKind {
         create(.enum, from: node)
         return .visitChildren
     }
+    #else
+    func visit(_ node: EnumDeclSyntax) -> SyntaxVisitorContinueKind {
+        create(.enum, from: node)
+        return .visitChildren
+    }
+    #endif
 
     /// Triggered on exiting an enum; moves back up the tree
+    #if swift(>=5.2)
     override func visitPost(_ node: EnumDeclSyntax) {
         current = current?.parent
     }
+    #else
+    func visitPost(_ node: EnumDeclSyntax) {
+        current = current?.parent
+    }
+    #endif
 
     /// Triggered on exiting a single enum case
+    #if swift(>=5.2)
     override func visitPost(_ node: EnumCaseElementSyntax) {
         current?.cases.append(node.identifier.text)
     }
+    #else
+    func visitPost(_ node: EnumCaseElementSyntax) {
+        current?.cases.append(node.identifier.text)
+    }
+    #endif
 
     /// Triggered on entering an extension
+    #if swift(>=5.2)
     override func visit(_ node: ExtensionDeclSyntax) -> SyntaxVisitorContinueKind {
         create(.extension, from: node)
         return .visitChildren
     }
+    #else
+    func visit(_ node: ExtensionDeclSyntax) -> SyntaxVisitorContinueKind {
+        create(.extension, from: node)
+        return .visitChildren
+    }
+    #endif
 
     /// Triggered on exiting an extension; moves back up the tree
+    #if swift(>=5.2)
     override func visitPost(_ node: ExtensionDeclSyntax) {
         current = current?.parent
     }
+    #else
+    func visitPost(_ node: ExtensionDeclSyntax) {
+        current = current?.parent
+    }
+    #endif
 
     /// Triggered on entering a function
+    #if swift(>=5.2)
     override func visit(_ node: FunctionDeclSyntax) -> SyntaxVisitorContinueKind {
         var throwingStatus = Function.ThrowingStatus.unknown
         var isStatic = false
@@ -118,37 +164,118 @@ class FileVisitor: SyntaxVisitor {
 
         return .visitChildren
     }
+    #else
+    func visit(_ node: FunctionDeclSyntax) -> SyntaxVisitorContinueKind {
+        var throwingStatus = Function.ThrowingStatus.unknown
+        var isStatic = false
+        var returnType = ""
+
+        // Examine this function's modifiers to figure out whether it's static
+        if let modifiers = node.modifiers {
+            for modifier in modifiers {
+                let modifierText = modifier.withoutTrivia().name.text
+
+                if modifierText == "static" || modifierText == "class" {
+                    isStatic = true
+                }
+            }
+        }
+
+        // Copy in the throwing status
+        if let throwsKeyword = node.signature.throwsOrRethrowsKeyword {
+            if let throwsOrRethrows = Function.ThrowingStatus(rawValue: throwsKeyword.text) {
+                throwingStatus = throwsOrRethrows
+            }
+        } else {
+            throwingStatus = .none
+        }
+
+        let name = node.identifier.text
+
+        // Flatten the list of parameters for easier storage
+        let parameters = node.signature.input.parameterList.compactMap { $0.firstName?.text }
+
+        // If we have a return type, copy it here
+        if let nodeReturnType = node.signature.output?.returnType {
+            returnType = "\(nodeReturnType)"
+        }
+
+        let newObject = Function(name: name, parameters: parameters, isStatic: isStatic, throwingStatus: throwingStatus, returnType: returnType)
+
+        // Move one level deeper in our tree
+        newObject.parent = current
+        current?.functions.append(newObject)
+        current = newObject
+
+        return .visitChildren
+    }
+    #endif
 
     /// Triggered on exiting a function; moves back up the tree
+    #if swift(>=5.2)
     override func visitPost(_ node: FunctionDeclSyntax) {
         current = current?.parent
     }
+    #else
+    func visitPost(_ node: FunctionDeclSyntax) {
+        current = current?.parent
+    }
+    #endif
 
     /// Triggered on entering an identifer pattern – the part of a variable that contains its name
+    #if swift(>=5.2)
     override func visit(_ node: IdentifierPatternSyntax) -> SyntaxVisitorContinueKind {
         current?.variables.append(node.identifier.text)
         return .visitChildren
     }
+    #else
+    func visit(_ node: IdentifierPatternSyntax) -> SyntaxVisitorContinueKind {
+        current?.variables.append(node.identifier.text)
+        return .visitChildren
+    }
+    #endif
 
     /// Triggered on finding an import statement
+    #if swift(>=5.2)
     override func visit(_ node: ImportDeclSyntax) -> SyntaxVisitorContinueKind {
         let importName = node.path.description
         imports.append(importName)
         return .visitChildren
     }
+    #else
+    func visit(_ node: ImportDeclSyntax) -> SyntaxVisitorContinueKind {
+        let importName = node.path.description
+        imports.append(importName)
+        return .visitChildren
+    }
+    #endif
 
     /// Triggered on entering a protocol
+    #if swift(>=5.2)
     override func visit(_ node: ProtocolDeclSyntax) -> SyntaxVisitorContinueKind {
         create(.protocol, from: node)
         return .visitChildren
     }
+    #else
+    func visit(_ node: ProtocolDeclSyntax) -> SyntaxVisitorContinueKind {
+        create(.protocol, from: node)
+        return .visitChildren
+    }
+    #endif
 
     /// Triggered on exiting a protocol; moves back up the tree
+    #if swift(>=5.2)
     override func visitPost(_ node: ProtocolDeclSyntax) {
         current = current?.parent
     }
+    #else
+    func visitPost(_ node: ProtocolDeclSyntax) {
+        current = current?.parent
+    }
+    #endif
 
     /// Triggered on entering a file
+    #if swift(>=5.2)
     override func visit(_ node: SourceFileSyntax) -> SyntaxVisitorContinueKind {
         #if swift(>=5.2)
         comments = comments(for: node._syntaxNode)
@@ -159,17 +286,42 @@ class FileVisitor: SyntaxVisitor {
         strippedBody = body.removingDuplicateLineBreaks()
         return .visitChildren
     }
+    #else
+    func visit(_ node: SourceFileSyntax) -> SyntaxVisitorContinueKind {
+        #if swift(>=5.2)
+        comments = comments(for: node._syntaxNode)
+        #else
+        comments = comments(for: node)
+        #endif
+        body = "\(node)"
+        strippedBody = body.removingDuplicateLineBreaks()
+        return .visitChildren
+    }
+    #endif
 
     /// Triggered on entering a struct
+    #if swift(>=5.2)
     override func visit(_ node: StructDeclSyntax) -> SyntaxVisitorContinueKind {
         create(.struct, from: node)
         return .visitChildren
     }
+    #else
+    func visit(_ node: StructDeclSyntax) -> SyntaxVisitorContinueKind {
+        create(.struct, from: node)
+        return .visitChildren
+    }
+    #endif
 
     /// Triggered on exiting a struct; moves back up the tree
+    #if swift(>=5.2)
     override func visitPost(_ node: StructDeclSyntax) {
         current = current?.parent
     }
+    #else
+    func visitPost(_ node: StructDeclSyntax) {
+        current = current?.parent
+    }
+    #endif
 
     /// Converts trivia to comments
     func extractComments(from trivia: TriviaPiece) -> Comment? {
