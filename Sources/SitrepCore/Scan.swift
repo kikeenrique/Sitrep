@@ -66,8 +66,17 @@ public struct Scan {
 
     public func detectFiles(excludedPath: [String] = []) -> [URL] {
         let fileManager = FileManager.default
-        let enumerator = fileManager.enumerator(at: rootURL, includingPropertiesForKeys: nil)
-
+        
+        var isDirectory: ObjCBool = false
+        if fileManager.fileExists(atPath: rootURL.path, isDirectory: &isDirectory), !isDirectory.boolValue {
+            let isExcluded = excludedPath.contains { rootURL.deletingLastPathComponent().relativePath.hasPrefix($0) }
+            if rootURL.pathExtension == "swift" && !isExcluded {
+                return [rootURL]
+            }
+            return []
+        }
+        
+        let enumerator = fileManager.enumerator(at: rootURL, includingPropertiesForKeys: [.isRegularFileKey])
         var detectedFiles = [URL]()
 
         while let objectURL = enumerator?.nextObject() as? URL {
@@ -92,9 +101,10 @@ public struct Scan {
         var failures = [URL]()
 
         for file in files {
-            if let file = try? File(url: file) {
+            do {
+                let file = try File(url: file)
                 scannedFiles.append(file)
-            } else {
+            } catch {
                 failures.append(file)
             }
         }
@@ -190,7 +200,9 @@ public struct Scan {
                                       totalLinesOfCode: results.totalLinesOfCode,
                                       totalStrippedLinesOfCode: results.totalStrippedLinesOfCode,
                                       longestFile: longestFileStat,
-                                      longestType: longestTypeStat),
+                                      longestType: longestTypeStat,
+                                      uiKitLinesOfCode: results.uiKitLinesOfCode,
+                                      swiftUILinesOfCode: results.swiftUILinesOfCode),
                      objects: .init(structs: results.structs.count,
                                     classes: results.classes.count,
                                     enums: results.enums.count,
@@ -250,7 +262,9 @@ public struct Scan {
         output.append("   Imports: \(imports)")
         output.append("   UIKit View Controllers: \(results.uiKitViewControllerCount)")
         output.append("   UIKit Views: \(results.uiKitViewCount)")
+        output.append("   UIKit lines of code: \(results.uiKitLinesOfCode)")
         output.append("   SwiftUI Views: \(results.swiftUIViewCount)")
+        output.append("   SwiftUI lines of code: \(results.swiftUILinesOfCode)")
         output.append("")
 
         return output.joined(separator: "\n")
