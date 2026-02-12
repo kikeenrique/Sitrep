@@ -83,10 +83,7 @@ public struct Results {
 
     /// The total number of striped lines of code scanned across all files and related to UIKit
     var uiKitLinesOfCode: Int {
-        let uiKitClasses: [String] = [
-            "UIApplication", "UIWindow", "UINavigationController", "UISplitViewController", "UIViewController", "UIView", "UITableViewController", "UITableView", "UITableViewCell", "UIScrollView", "UIBarButtonItem", "UIBarItem", "UITabBarController", "UITabBarItem", "UIStackView", "UICollectionView", "UICollectionViewCell", "UIButton", "UIControl", "UITextView", "UITextField", "UILabel", "UIPickerView", "UIImageView", "UISwitch", "MKMapView", "MKAnnotationView"
-        ]
-        let filteredClasses = classes.extending(from: uiKitClasses)
+        let filteredClasses = classes.extending(from: Type.uiKitClasses)
         let classesLinesOfCode = filteredClasses.reduce(0) { result, type in
             return result + type.strippedBody.lines.count
         }
@@ -98,7 +95,7 @@ public struct Results {
         let portsLinesOfCode = filteredPorts.reduce(0) { result, type in
             return result + type.strippedBody.lines.count
         }
-        let extensionTypes = filteredClasses.map { $0.name } + uiKitClasses + filteredPorts.map { $0.name } + portTypes
+        let extensionTypes = filteredClasses.map { $0.name } + Type.uiKitClasses + filteredPorts.map { $0.name } + portTypes
         let extensionsLinesOfCode = extensions.reduce(0) { result, type in
             guard extensionTypes.contains(type.name) else { return result }
             return result + type.strippedBody.lines.count
@@ -108,15 +105,15 @@ public struct Results {
 
     /// The total number of striped lines of code scanned across all files and related to SwiftUI
     var swiftUILinesOfCode: Int {
-        let viewTypes = structs.filter { $0.inheritance.first == "View" }
-        let viewsLinesOfCode = viewTypes.reduce(0) { result, type in
+        let uiTypes = structs.extending(from: Type.swiftUIProtocols)
+        let uiLinesOfCode = uiTypes.reduce(0) { result, type in
             return result + type.strippedBody.lines.count
         }
-        let extensionTypes = viewTypes.map { $0.name } + ["View"]
+        let extensionTypes = uiTypes.map { $0.name } + Type.swiftUIProtocols
         let extensionsLinesOfCode = extensions.reduce(0) { result, type in
             guard extensionTypes.contains(type.name) else { return result }
             return result + type.strippedBody.lines.count
         }
-        return viewsLinesOfCode + extensionsLinesOfCode
+        return uiLinesOfCode + extensionsLinesOfCode
     }
 }

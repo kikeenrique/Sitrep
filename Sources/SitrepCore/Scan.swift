@@ -67,6 +67,7 @@ public struct Scan {
     public func detectFiles(excludedPath: [String] = []) -> [URL] {
         let fileManager = FileManager.default
         
+        // Handle the case where the rootURL points directly to the single file instead of a directory and returns the same rootUrl
         var isDirectory: ObjCBool = false
         if fileManager.fileExists(atPath: rootURL.path, isDirectory: &isDirectory), !isDirectory.boolValue {
             let isExcluded = excludedPath.contains { rootURL.deletingLastPathComponent().relativePath.hasPrefix($0) }
