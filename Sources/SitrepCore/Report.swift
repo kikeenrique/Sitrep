@@ -33,6 +33,10 @@ public struct Report: Codable {
         public var longestFile: Stat?
         /// Longest type name and length 
         public var longestType: Stat?
+        /// UIKit lines of code
+        public var uiKitLinesOfCode: Int
+        /// SwiftUI lines of code
+        public var swiftUILinesOfCode: Int
     }
 
     /// Object related statistics
