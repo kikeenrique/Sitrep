@@ -64,7 +64,7 @@ First, add Sitrep as a dependency in your `Package.swift` file:
 let package = Package(
     //...
     dependencies: [
-        .package(url: "https://github.com/twostraws/Sitrep", .branch("master"))
+        .package(url: "https://github.com/twostraws/Sitrep", .branch("main"))
     ],
     //...
 )
