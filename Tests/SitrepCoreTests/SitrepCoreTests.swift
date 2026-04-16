@@ -125,7 +125,7 @@ final class SitrepCoreTests: XCTestCase {
         let app = Scan(rootURL: inputs)
         let files = app.detectFiles()
 
-        XCTAssertEqual(files.count, 10)
+        XCTAssertEqual(files.count, 12)
     }
 
     func testBadFileScanning() throws {
@@ -145,7 +145,7 @@ final class SitrepCoreTests: XCTestCase {
         let app = Scan(rootURL: inputs)
         let (_, files, failures) = app.run(creatingReport: false)
 
-        XCTAssertEqual(files.count, 10)
+        XCTAssertEqual(files.count, 12)
         XCTAssertEqual(failures.count, 0)
     }
 
@@ -153,28 +153,28 @@ final class SitrepCoreTests: XCTestCase {
         let app = Scan(rootURL: inputs)
         let (results, _, _) = app.run(creatingReport: false)
 
-        XCTAssertEqual(results.classes.count, 4)
-        XCTAssertEqual(results.structs.count, 3)
+        XCTAssertEqual(results.classes.count, 8)
+        XCTAssertEqual(results.structs.count, 7)
         XCTAssertEqual(results.enums.count, 1)
         XCTAssertEqual(results.protocols.count, 4)
-        XCTAssertEqual(results.extensions.count, 2)
+        XCTAssertEqual(results.extensions.count, 13)
     }
 
     func testCollationImports() throws {
         let app = Scan(rootURL: inputs)
         let (results, _, _) = app.run(creatingReport: false)
 
-        XCTAssertEqual(results.imports.count(for: "UIKit"), 2)
-        XCTAssertEqual(results.imports.count(for: "SwiftUI"), 3)
+        XCTAssertEqual(results.imports.count(for: "UIKit"), 3)
+        XCTAssertEqual(results.imports.count(for: "SwiftUI"), 4)
     }
 
     func testSpecificInheritances() throws {
         let app = Scan(rootURL: inputs)
         let (results, _, _) = app.run(creatingReport: false)
 
-        XCTAssertEqual(results.uiKitViewControllerCount, 2)
-        XCTAssertEqual(results.uiKitViewCount, 0)
-        XCTAssertEqual(results.swiftUIViewCount, 1)
+        XCTAssertEqual(results.uiKitViewControllerCount, 3)
+        XCTAssertEqual(results.uiKitViewCount, 1)
+        XCTAssertEqual(results.swiftUIViewCount, 3)
     }
 
     func testEncoding() throws {
@@ -220,7 +220,7 @@ final class SitrepCoreTests: XCTestCase {
         let app = Scan(rootURL: inputs)
         let (_, files, failures) = app.run(creatingReport: true)
 
-        XCTAssertEqual(files.count, 10)
+        XCTAssertEqual(files.count, 12)
         XCTAssertEqual(failures.count, 0)
     }
 
@@ -240,11 +240,26 @@ final class SitrepCoreTests: XCTestCase {
         let (_, files, _) = app.run(reportType: .json, configuration: config)
 
         XCTAssertEqual(
-            files.count, 9,
-            "There should be 9 files in all test inputs, because IgnoredDirectory should be excluded."
+            files.count, 11,
+            "There should be 11 files in all test inputs, because IgnoredDirectory should be excluded."
         )
     }
-
+    
+    func testUIKitLinesOfCode() throws {
+        let input = try getInput("uikit_lines_of_code.swift")
+        let app = Scan(rootURL: input)
+        let (results, _, _) = app.run(creatingReport: false)
+        XCTAssertEqual(results.uiKitLinesOfCode, 66)
+    }
+    
+    
+    func testSwiftUILinesOfCode() throws {
+        let input = try getInput("swiftui_lines_of_code.swift")
+        let app = Scan(rootURL: input)
+        let (results, _, _) = app.run(creatingReport: false)
+        XCTAssertEqual(results.swiftUILinesOfCode, 25)
+    }
+    
     static var allTests = [
         ("testClassDetection", testClassDetection),
         ("testStructDetection", testStructDetection),
@@ -268,5 +283,7 @@ final class SitrepCoreTests: XCTestCase {
         ("testCreatingReport", testCreatingReport),
         ("testLongestType", testLongestType),
         ("testIgnoredFiles", testIgnoredFiles),
+        ("testUIKitLinesOfCode", testUIKitLinesOfCode),
+        ("testSwiftUILinesOfCode", testSwiftUILinesOfCode)
     ]
 }

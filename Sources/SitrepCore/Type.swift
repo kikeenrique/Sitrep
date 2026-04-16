@@ -63,3 +63,44 @@ class Type: Node {
         try container.encode(strippedBody, forKey: .strippedBody)
     }
 }
+
+extension Type {
+    static let uiKitClasses: [String] = [
+        "MKAnnotationView",
+        "MKMapView",
+        "UIApplication",
+        "UIBarButtonItem",
+        "UIBarItem",
+        "UIButton",
+        "UICollectionView",
+        "UICollectionViewCell",
+        "UIControl",
+        "UIImageView",
+        "UILabel",
+        "UINavigationController",
+        "UIPickerView",
+        "UIScrollView",
+        "UISplitViewController",
+        "UIStackView",
+        "UISwitch",
+        "UITabBarController",
+        "UITabBarItem",
+        "UITableView",
+        "UITableViewCell",
+        "UITableViewController",
+        "UITextField",
+        "UITextView",
+        "UIView",
+        "UIViewController",
+        "UIWindow",
+    ]
+    
+    static let swiftUIProtocols: [String] = [
+        "App",
+        "ButtonStyle",
+        "ShapeStyle",
+        "View",
+        "ViewModifier",
+        "Label"
+    ]
+}

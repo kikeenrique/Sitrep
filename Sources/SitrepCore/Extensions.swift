@@ -39,3 +39,45 @@ extension String {
         return nonEmptyLines.joined(separator: "\n")
     }
 }
+
+extension Collection where Element == Type {
+    /// Returns filtered types which are extended by provided type names
+    func extending(from typeNames: [String]) -> [Element] {
+        let descendants = descendants()
+        return typeNames.flatMap { extending(from: $0, descendants: descendants) }
+    }
+    
+    /// Returns filtered types which are extended by provided type name
+    func extending(from typeName: String, descendants: [String: String]) -> [Element] {
+        return filter { $0.extends(from: typeName, descendants: descendants) }
+    }
+    
+    /// Returns a map with all possible descendants in the collection
+    func descendants() -> [String: String] {
+        var map = [String: String]()
+        for type in self {
+            guard let inheritance = type.inheritance.first else { continue }
+            map[type.name] = inheritance
+        }
+        return map
+    }
+}
+
+private extension Type {
+    /// Checks whether the type is extended by the `typeName` by looking into all descendants
+    func extends(from typeName: String, descendants: [String: String]) -> Bool {
+        var current: String? = name
+        var visited = Set<String>()
+        
+        while let name = current {
+            if visited.contains(name) { return false }
+            visited.insert(name)
+           
+            if name == typeName { return true }
+            current = descendants[name]
+        }
+        
+        return false
+    }
+}
+

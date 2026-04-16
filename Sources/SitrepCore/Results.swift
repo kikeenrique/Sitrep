@@ -80,4 +80,40 @@ public struct Results {
     var swiftUIViewCount: Int {
         structs.sum { $0.inheritance.contains("View") }
     }
+
+    /// The total number of striped lines of code scanned across all files and related to UIKit
+    var uiKitLinesOfCode: Int {
+        let filteredClasses = classes.extending(from: Type.uiKitClasses)
+        let classesLinesOfCode = filteredClasses.reduce(0) { result, type in
+            return result + type.strippedBody.lines.count
+        }
+        let portTypes = ["UIViewRepresentable", "UIViewControllerRepresentable"]
+        let filteredPorts = structs.filter {
+            guard let inheritance = $0.inheritance.first else { return false }
+            return portTypes.contains(inheritance)
+        }
+        let portsLinesOfCode = filteredPorts.reduce(0) { result, type in
+            return result + type.strippedBody.lines.count
+        }
+        let extensionTypes = filteredClasses.map { $0.name } + Type.uiKitClasses + filteredPorts.map { $0.name } + portTypes
+        let extensionsLinesOfCode = extensions.reduce(0) { result, type in
+            guard extensionTypes.contains(type.name) else { return result }
+            return result + type.strippedBody.lines.count
+        }
+        return classesLinesOfCode + portsLinesOfCode + extensionsLinesOfCode
+    }
+
+    /// The total number of striped lines of code scanned across all files and related to SwiftUI
+    var swiftUILinesOfCode: Int {
+        let uiTypes = structs.extending(from: Type.swiftUIProtocols)
+        let uiLinesOfCode = uiTypes.reduce(0) { result, type in
+            return result + type.strippedBody.lines.count
+        }
+        let extensionTypes = uiTypes.map { $0.name } + Type.swiftUIProtocols
+        let extensionsLinesOfCode = extensions.reduce(0) { result, type in
+            guard extensionTypes.contains(type.name) else { return result }
+            return result + type.strippedBody.lines.count
+        }
+        return uiLinesOfCode + extensionsLinesOfCode
+    }
 }
