@@ -3,7 +3,8 @@
 </p>
 
 <p align="center">
-    <img src="https://img.shields.io/badge/Swift-5.8-red.svg" />
+    <img src="https://img.shields.io/badge/Swift-5.9+-red.svg" />
+    <img src="https://img.shields.io/badge/platforms-macOS%20%7C%20Linux-lightgrey.svg" />
     <a href="https://twitter.com/twostraws">
         <img src="https://img.shields.io/badge/Contact-@twostraws-blueviolet.svg?style=flat" alt="Twitter: @twostraws" />
     </a>
@@ -26,9 +27,22 @@ Sitrep is built using Apple’s [SwiftSyntax](https://github.com/apple/swift-syn
 
 ## Installation
 
-If you want to install the Sitrep command line tool, you have three options: [Homebrew](https://brew.sh), [Mint](https://github.com/yonaskolb/Mint), or building it from the command line yourself.
+Sitrep runs on macOS and Linux. You can install a prebuilt binary, use [Homebrew](https://brew.sh) or [Mint](https://github.com/yonaskolb/Mint), or build it from source yourself.
 
-Use this command for Homebrew:
+### Prebuilt binaries
+
+Binaries are attached to each [GitHub release](https://github.com/twostraws/Sitrep/releases): a universal (arm64 + x86_64) macOS binary, and Linux binaries for x86_64 and aarch64 in two variants — `-gnu` for glibc distributions (Debian, Ubuntu, Fedora, RHEL and the rest), and `-musl` for Alpine, other musl distributions, and distroless images. All of them bundle the Swift runtime, so no toolchain is needed on the target machine.
+
+Downloading by hand, take `-gnu` unless you know you are on musl:
+
+```bash
+tar -xzf sitrep-x86_64-unknown-linux-gnu.tar.gz
+install sitrep /usr/local/bin/sitrep
+```
+
+Each release also ships a `SHA256SUMS` file to verify against.
+
+### Homebrew
 
 ```bash
 brew install twostraws/brew/sitrep
@@ -36,14 +50,18 @@ brew install twostraws/brew/sitrep
 
 Using Homebrew allows you to run `sitrep` directly from the command line.
 
-For Mint, install and run Sitrep with these command:
+### Mint
+
+Mint builds from source, and works on both macOS and Linux:
 
 ```bash
 mint install twostraws/Sitrep@main
 mint run sitrep@main
 ```
 
-And finally, to build and install the command line tool yourself, clone the repository and run `make install`:
+### Building it yourself
+
+Clone the repository and run `make install`:
 
 ```bash
 git clone https://github.com/twostraws/Sitrep
@@ -52,6 +70,11 @@ make install
 ```
 
 As with the Homebrew option, building the command line tool yourself allows you to use the `sitrep` command directly from the command line.
+
+### Linux notes
+
+- **Which variant.** The `-gnu` build is linked against glibc and will not start on a system whose glibc is older than the one it was built against; it is built on RHEL UBI 9 (glibc 2.34) to keep that floor low, so it runs on RHEL 9, Debian 12, Ubuntu 22.04 and anything newer. The `-musl` build is fully static with no libc dependency, so it runs anywhere — including images the `-gnu` build cannot serve.
+- **Binary size.** Sitrep statically links SwiftSyntax, which is large. Expect the archives to be substantially bigger than a typical CLI download.
 
 
 ## Using Sitrep as a library
@@ -104,7 +127,7 @@ Alternatively, you can use the `-i` parameter to have Sitrep tell you the config
 
 ## Try it yourself
 
-Sitrep is written using Swift 5.8. You can either build and run the executable directly, or integrate the SitrepCore library into your own code.
+Sitrep requires Swift 5.9 or later (the minimum SwiftSyntax 602 declares) on macOS 10.15+ or Linux; CI builds and tests with Swift 6.3 on macOS and Swift 6.4 on Linux. You can either build and run the executable directly, or integrate the SitrepCore library into your own code.
 
 To build Sitrep, clone this repository and open Terminal in the repository root directory. Then run:
 
