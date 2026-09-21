@@ -17,7 +17,7 @@ let package = Package(
     ],
     products: [
         .library(name: "SitrepCore", targets: ["SitrepCore"]),
-        .executable(name: "Sitrep", targets: ["Sitrep"]),
+        .executable(name: "sitrep", targets: ["Sitrep"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-syntax.git", from: "602.0.0"),
