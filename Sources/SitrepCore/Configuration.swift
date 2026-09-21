@@ -2,7 +2,7 @@ import Foundation
 import Yams
 
 /// Holds the complete set of configured values and defaults.
-public struct Configuration: Codable {
+public struct Configuration: Codable, Sendable {
     private let excluded: [String]
 
     public static let `default`: Configuration = .init(
@@ -34,7 +34,7 @@ extension Configuration {
 
     public static func parse(_ url: URL) throws -> Configuration {
         let decoder = YAMLDecoder()
-        let data = try String(contentsOf: url)
+        let data = try String(contentsOf: url, encoding: .utf8)
         return try decoder.decode(Self.self, from: data)
     }
 }
