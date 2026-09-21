@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+#MISE description="Build fully static (musl) Linux release binaries for x86_64 + aarch64 into dist/"
+#
+# The secondary Linux artifact, for hosts the glibc build cannot serve: Alpine and
+# other musl distributions, and distroless images. Built against the Swift Static
+# Linux SDK, so both slices are fully static with no libc dependency at all — which
+# is also what lets one x86_64 runner produce the aarch64 artifact.
+#
+# `package-linux-gnu` builds the conventional primary artifact.
+#
+# Requires a swift.org toolchain with a *matching* version of the static SDK
+# installed. Xcode's toolchain cannot consume the swift.org SDK ("compiled module
+# was created by a different version of the compiler"), so this task does not run
+# on a stock macOS install — it is a Linux-CI task. See .github/workflows/release.yml.
+set -euo pipefail
+
+# Only this variant's slice of dist/ is cleared; see the note in `package`.
+rm -f dist/SHA256SUMS.linux-musl dist/sitrep-*-unknown-linux-musl.tar.gz
+mkdir -p dist
+
+# Left-hand side is the SDK name, right-hand side the asset name. Assets are named
+# with the full target triple, libc included, which is the prevailing convention for
+# Linux release assets and what installers parse. `ubi` only filters on libc when the
+# *host* is musl (glibc hosts accept any asset), and `mise` scores rather than
+# filters, so the honest `-musl` name costs nothing on glibc hosts.
+#
+# Fail rather than silently ship debug info again: the point of the flag below is
+# the download size. The check needs readelf (binutils). It always says what it
+# did, because a silent skip is indistinguishable from a pass: where readelf is
+# missing it emits a GitHub Actions warning, which shows on the run's summary page.
+assert_no_debug_info() {
+  if ! command -v readelf >/dev/null 2>&1; then
+    echo "::warning::debug-info check skipped for $(basename "$1") — readelf not available"
+    return 0
+  fi
+  # Read the headers into a variable first: piping readelf into `grep -q` lets grep
+  # exit on the first match, readelf die of SIGPIPE, and pipefail turn a hit into a miss.
+  if grep -q '\.debug_info' <<<"$(readelf -S "$1")"; then
+    echo "debug info still present in $1 — --strip-debug did not take effect" >&2
+    exit 1
+  fi
+  echo "debug-info check passed: no .debug_info in $1 (readelf)"
+}
+
+# -Xlinker --strip-debug: the Static Linux SDK's prebuilt static libraries —
+# Foundation, ICU, curl, BoringSSL — carry their debug info, and full static
+# linking pulls all of it in on top of SwiftSyntax's. Dropping DWARF at link time
+# keeps the symbol table, so Swift crash backtraces still name functions. The
+# linker does it for whichever architecture it is linking, so the aarch64 slice
+# needs no cross-arch strip tool on this x86_64 runner.
+build() {
+  sdk="$1"
+  triple="$2"
+  flags=(-c release --product sitrep --swift-sdk "$sdk" -Xlinker --strip-debug)
+  swift build "${flags[@]}"
+  bin="$(swift build "${flags[@]}" --show-bin-path)"
+  # Diagnostic only, and not every image ships file(1) — never fail the build for it.
+  command -v file >/dev/null 2>&1 && file "$bin/sitrep" || true
+  ls -l "$bin/sitrep"
+  assert_no_debug_info "$bin/sitrep"
+  # gzip -n omits the timestamp/name so repeated packaging of the same binary is
+  # byte-identical, matching how `package` builds its darwin archives.
+  tar -cf - -C "$bin" sitrep | gzip -n > "dist/sitrep-$triple.tar.gz"
+  # Hashed from inside dist/ so the entry is a bare filename; see the note in `package`.
+  (cd dist && sha256sum "sitrep-$triple.tar.gz") | tee -a dist/SHA256SUMS.linux-musl
+}
+
+build x86_64-swift-linux-musl x86_64-unknown-linux-musl
+build aarch64-swift-linux-musl aarch64-unknown-linux-musl
+
+ls -l dist

@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+#MISE description="Unpack a release tarball and check the binary runs and analyzes correctly. Usage: mise run smoke-test dist/sitrep-<triple>.tar.gz"
+#USAGE arg "<tarball>" help="Release tarball to test; must match the host architecture and libc"
+#
+# A binary that starts but mis-parses is broken in the only way that matters, so
+# this asserts on real analysis output rather than just checking it runs.
+#
+# Two things make this worth doing on every release rather than trusting the unit
+# tests, both specific to what a *packaged* binary does differently:
+#
+#   - `Scan.detectFiles` walks the tree with FileManager.enumerator and
+#     `hasDirectoryPath`. That is swift-corelibs-foundation on Linux, not Darwin
+#     Foundation, and directory recursion is the part most likely to diverge — so
+#     the fixture below is deliberately nested rather than flat.
+#   - The static builds link the Swift runtime in. SwiftSyntax is the bulk of this
+#     binary, and a parser that silently returns nothing would still exit 0 and
+#     print a well-formed report full of zeroes. Hence exact expected counts.
+set -euo pipefail
+
+tarball="$usage_tarball"
+[ -f "$tarball" ] || { echo "no such tarball: $tarball" >&2; exit 1; }
+
+workdir="$(mktemp -d)"
+trap 'rm -rf "$workdir"' EXIT
+tar -xzf "$tarball" -C "$workdir"
+
+echo "== $tarball: does it run?"
+reported="$("$workdir/sitrep" --version)"
+echo "$reported"
+
+# The release workflow passes the tag it is building. `mise run release` derives
+# every tag from Version.swift, so the two always agree — but a tag pushed by
+# hand bypasses that, and this stops such a release publishing a binary that
+# misreports its own version.
+if [ -n "${EXPECTED_VERSION:-}" ] && [ "$reported" != "$EXPECTED_VERSION" ]; then
+  echo "FAIL: tag is $EXPECTED_VERSION but the binary reports $reported" >&2
+  echo "was the tag pushed by hand rather than with \`mise run release\`?" >&2
+  exit 1
+fi
+
+# Nested on purpose: `nested/` exercises the enumerator's directory recursion,
+# which is the Foundation behaviour most at risk of differing on Linux.
+fixture="$workdir/fixture"
+mkdir -p "$fixture/nested"
+cat > "$fixture/top.swift" <<'SWIFT'
+import Foundation
+
+class Alpha {
+    func go() {
+        print("hi")
+    }
+}
+SWIFT
+cat > "$fixture/nested/deep.swift" <<'SWIFT'
+import Foundation
+
+struct Beta {}
+
+enum Gamma { case a }
+
+protocol Delta {}
+SWIFT
+# Not Swift: proves the extension filter still excludes non-Swift files.
+echo "not swift" > "$fixture/nested/notes.txt"
+
+echo "== $tarball: does it analyze?"
+output="$("$workdir/sitrep" --path "$fixture")"
+echo "$output"
+
+fail=0
+expect() {
+  if ! printf '%s' "$output" | grep -qF "$1"; then
+    echo "FAIL: expected to find '$1' in the report" >&2
+    fail=1
+  fi
+}
+
+# Two files means the walk recursed into nested/; the type counts mean SwiftSyntax
+# actually parsed both of them rather than returning empty trees.
+expect "Files scanned: 2"
+expect "Structs: 1"
+expect "Classes: 1"
+expect "Enums: 1"
+expect "Protocols: 1"
+
+echo "== $tarball: is the JSON report well-formed?"
+json="$("$workdir/sitrep" --path "$fixture" --format json)"
+echo "$json"
+# Exercises Foundation's JSONEncoder, a separate corelibs surface from the text path.
+for fragment in '"scannedFiles" : 2' '"classes" : 1' '"structs" : 1'; do
+  if ! printf '%s' "$json" | grep -qF "$fragment"; then
+    echo "FAIL: expected to find '$fragment' in the JSON report" >&2
+    fail=1
+  fi
+done
+
+if [ "$fail" -ne 0 ]; then
+  echo "FAIL: $tarball did not analyze correctly" >&2
+  exit 1
+fi
+
+echo "OK: $tarball runs and analyzes correctly"

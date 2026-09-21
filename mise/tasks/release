@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+#MISE description="Bump Version.swift, commit it, tag that commit, and push — triggering the release CI. Usage: mise run release 4.1.0"
+#USAGE arg "<version>" help="Version to release, e.g. 4.1.0 or 4.1.0-rc.1 (no leading v — this repo's tags are bare)"
+#
+# Sources/Sitrep/Version.swift is the single source of truth for the version,
+# and this task is the only thing that should change it. It writes the new
+# version, commits that change, and tags the commit — so the tag is derived from
+# the file and the two can never disagree, and there is nothing to remember to
+# bump before releasing.
+set -euo pipefail
+
+version="$usage_version"
+version_file=Sources/Sitrep/Version.swift
+
+# This repo's existing tags are bare (1.0.0 … 4.0.0), not v-prefixed.
+case "$version" in
+  v*)
+    echo "tags in this repo are bare, not v-prefixed — use ${version#v}" >&2
+    exit 1
+    ;;
+esac
+if ! printf '%s' "$version" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+  echo "not a version: $version (expected MAJOR.MINOR.PATCH, optionally -prerelease)" >&2
+  exit 1
+fi
+
+# The release commit must contain exactly what was reviewed: refuse to sweep
+# uncommitted work into it, or to release from a branch missing upstream commits.
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  echo "working tree has uncommitted changes — commit or stash them first" >&2
+  exit 1
+fi
+git fetch --quiet origin
+if ! upstream=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null); then
+  echo "$(git branch --show-current) has no upstream branch — push it first" >&2
+  exit 1
+fi
+if [ "$(git rev-list --count "HEAD..$upstream")" -ne 0 ]; then
+  echo "$upstream has commits this branch lacks — pull first" >&2
+  exit 1
+fi
+
+# Re-runnable: a failed push (auth, network) leaves the commit and tag behind.
+# Reuse the tag when it already marks HEAD; refuse when it marks anything else,
+# since moving a published tag would repoint a release at different code.
+if existing=$(git rev-parse -q --verify "refs/tags/$version"); then
+  if [ "$existing" != "$(git rev-parse HEAD)" ]; then
+    echo "tag $version already exists on $(git log --oneline -1 "$version")" >&2
+    echo "it is not HEAD — delete it deliberately or pick another version" >&2
+    exit 1
+  fi
+  echo "tag $version already on HEAD — reusing it"
+else
+  current=$(sed -n 's/^let sitrepVersion = "\(.*\)"$/\1/p' "$version_file")
+  if [ -z "$current" ]; then
+    echo "could not find the sitrepVersion line in $version_file" >&2
+    exit 1
+  fi
+
+  if [ "$current" = "$version" ]; then
+    # Already bumped, e.g. by an earlier run that stopped before tagging.
+    echo "$version_file already says $version — tagging HEAD without a new commit"
+  else
+    tmp="$(mktemp)"
+    sed "s/^let sitrepVersion = \".*\"$/let sitrepVersion = \"$version\"/" "$version_file" > "$tmp"
+    mv "$tmp" "$version_file"
+    git add "$version_file"
+    git commit --quiet -m "Release $version"
+    echo "bumped $version_file from $current to $version"
+  fi
+
+  git tag "$version"
+fi
+
+# The branch first, so the release commit is on it before CI builds the tag.
+git push origin HEAD
+git push origin "$version"
+echo "pushed $version — the release workflow will build and attach assets"
