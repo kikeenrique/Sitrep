@@ -34,5 +34,8 @@ let package = Package(
         ),
         .target(name: "SitrepCore", dependencies: dependencies),
         .testTarget(name: "SitrepCoreTests", dependencies: ["SitrepCore"], exclude: ["Inputs"]),
+        // Black-box tests that run the built executable. The dependency on
+        // Sitrep is what gets the binary built before the tests look for it.
+        .testTarget(name: "SitrepTests", dependencies: ["Sitrep"]),
     ]
 )
