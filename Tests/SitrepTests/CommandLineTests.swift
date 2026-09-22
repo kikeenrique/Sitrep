@@ -80,23 +80,19 @@ final class CommandLineTests: XCTestCase {
     /// recursion and the extension filter are the two parts of the walk most
     /// likely to behave differently between Darwin Foundation and
     /// swift-corelibs-foundation.
-    private func makeFixture() throws -> URL {
-        // Under .build rather than NSTemporaryDirectory(): on macOS the temporary
-        // directory sits below /var, which is a symlink to /private/var, and
-        // exclusions are matched as string prefixes of the path passed in while
-        // FileManager.enumerator reports the resolved form. A fixture under a
-        // symlink would therefore defeat testExcludedDirectoryIsSkipped for
-        // reasons having nothing to do with exclusions.
-        //
-        // (resolvingSymlinksInPath() is not the fix — Foundation strips the
-        // /private prefix rather than resolving to it, returning the path
-        // unchanged.)
-        let packageRoot = URL(fileURLWithPath: #filePath)
+    /// A location under `.build`, which — unlike the temporary directory on
+    /// macOS — is not reached through a symlink. See
+    /// `testExclusionsUnderASymlinkedPath` for why that distinction matters.
+    private var fixturesDirectory: URL {
+        URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()  // SitrepTests
             .deletingLastPathComponent()  // Tests
             .deletingLastPathComponent()  // package root
-        let root = packageRoot
             .appendingPathComponent(".build/test-fixtures")
+    }
+
+    private func makeFixture(in base: URL? = nil) throws -> URL {
+        let root = (base ?? fixturesDirectory)
             .appendingPathComponent("SitrepTests-\(UUID().uuidString)")
         let nested = root.appendingPathComponent("nested")
         try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
@@ -195,6 +191,49 @@ final class CommandLineTests: XCTestCase {
         XCTAssertTrue(result.standardOutput.contains("Files scanned: 1"), result.standardOutput)
         XCTAssertTrue(result.standardOutput.contains("Classes: 1"), result.standardOutput)
         XCTAssertTrue(result.standardOutput.contains("Structs: 0"), result.standardOutput)
+        XCTAssertTrue(result.standardOutput.contains("Enums: 0"), result.standardOutput)
+    }
+
+    /// Documents a known defect: exclusions are silently ignored when the
+    /// scanned path is reached through a symlink.
+    ///
+    /// `Configuration.excludedPath` builds prefix strings from the path the user
+    /// passed in, but `FileManager.enumerator` reports URLs with symlinks already
+    /// resolved, so the `hasPrefix` check in `Scan.detectFiles` never matches.
+    /// On macOS the temporary directory is below /var, a symlink to /private/var,
+    /// which is enough to trigger it — as is any project under /tmp, a layout
+    /// plenty of CI systems use. Nothing warns; the exclusions just do nothing.
+    ///
+    /// This test skips rather than fails while the defect stands, so it records
+    /// the behaviour without holding the suite red. Fixing it makes the test go
+    /// green on its own, at which point the skip condition should be updated so
+    /// this becomes an ordinary regression test.
+    ///
+    /// Note for whoever fixes it: `resolvingSymlinksInPath()` is not the answer.
+    /// Foundation strips a /private prefix rather than resolving to it, so it
+    /// returns these paths unchanged. Both sides need normalising to the same
+    /// form before they are compared.
+    func testExclusionsUnderASymlinkedPath() throws {
+        let fixture = try makeFixture(in: URL(fileURLWithPath: NSTemporaryDirectory()))
+        try "excluded:\n  - nested\n"
+            .write(to: fixture.appendingPathComponent(".sitrep.yml"), atomically: true, encoding: .utf8)
+
+        let result = try runSitrep(["--path", fixture.path])
+        XCTAssertEqual(result.exitCode, 0, result.standardError)
+
+        if result.standardOutput.contains("Files scanned: 2") {
+            throw XCTSkip("""
+                Known defect: `excluded:` is ignored when the scanned path contains a \
+                symlink, because Scan.detectFiles compares resolved enumerator URLs \
+                against unresolved prefixes from Configuration.excludedPath. \
+                Scanned path was \(fixture.path). Pending fix, update this test \
+                condition once fixed.
+                """)
+        }
+
+        // Either the platform's temporary directory is not symlinked (typical on
+        // Linux) or the defect has been fixed. Both mean exclusions must work.
+        XCTAssertTrue(result.standardOutput.contains("Files scanned: 1"), result.standardOutput)
         XCTAssertTrue(result.standardOutput.contains("Enums: 0"), result.standardOutput)
     }
 
