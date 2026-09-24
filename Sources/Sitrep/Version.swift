@@ -14,4 +14,4 @@
 /// is the only thing that should change it. That task writes the new version
 /// here, commits it, and tags that commit, so the tag is always derived from
 /// this file and can never disagree with it. Do not edit this by hand.
-let sitrepVersion = "4.0.0"
+let sitrepVersion = "4.1.0"
