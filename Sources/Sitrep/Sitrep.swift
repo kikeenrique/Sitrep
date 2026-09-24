@@ -11,6 +11,12 @@ import SitrepCore
 
 @main
 struct Sitrep: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "sitrep",
+        abstract: "A source code analyzer for Swift projects.",
+        version: sitrepVersion
+    )
+
     @Option(name: [.short, .customLong("config")], help: "The path of `.sitrep.yml`.")
     var configurationPath: String?
 

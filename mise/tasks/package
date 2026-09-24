@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+#MISE description="Build the universal (arm64+x86_64) macOS release binary and write arch tarballs to dist/"
+#
+# One multi-arch `swift build` rather than two per-arch builds fused with `lipo`:
+# `--show-bin-path` is not arch-qualified, so both per-arch builds report the
+# same output path and the second silently overwrites the first, leaving `lipo`
+# to fuse a binary with itself. Asking for both architectures at once produces
+# the universal binary directly.
+set -euo pipefail
+
+# Only the darwin slice of dist/ is cleared: the release workflow runs this and
+# the linux tasks on different runners, but a local `mise run package-linux-gnu`
+# afterwards must not wipe the macOS artifacts (and vice versa).
+rm -f dist/SHA256SUMS.darwin dist/sitrep-*-apple-darwin.tar.gz
+mkdir -p dist
+
+flags=(-c release --product sitrep --arch arm64 --arch x86_64)
+swift build "${flags[@]}"
+bin="$(swift build "${flags[@]}" --show-bin-path)"
+file "$bin/sitrep"
+
+# Fail loudly rather than shipping a single-architecture binary under a name
+# that promises both.
+for arch in arm64 x86_64; do
+  if ! file "$bin/sitrep" | grep -q "architecture $arch"; then
+    echo "expected a universal binary, but $arch is missing" >&2
+    exit 1
+  fi
+done
+
+# One universal binary, shipped under two target-triple names so `mise`/ubi
+# arch-matching resolves on both Apple Silicon and Intel; Homebrew picks per-arch.
+# gzip -n omits the timestamp/name from the header so the two archives are
+# byte-identical (both wrap the same binary) and share one sha256.
+for triple in aarch64-apple-darwin x86_64-apple-darwin; do
+  tar -cf - -C "$bin" sitrep | gzip -n > "dist/sitrep-$triple.tar.gz"
+  # Hashed from inside dist/ so the entry is a bare filename: users verify with
+  # `sha256sum -c SHA256SUMS` next to the downloaded assets, not in a dist/ folder.
+  (cd dist && shasum -a 256 "sitrep-$triple.tar.gz") | tee -a dist/SHA256SUMS.darwin
+done
+
+ls -l dist

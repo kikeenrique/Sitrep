@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+#MISE description="Build the glibc Linux release binary for the host architecture into dist/"
+#
+# The conventional primary Linux artifact, and the one most installers expect:
+# linked against glibc, with the Swift runtime bundled by --static-swift-stdlib so
+# users need no toolchain installed.
+#
+# glibc's symbol versioning sets a floor — the binary will not start on a system
+# whose glibc is older than the one it was built against — so this runs in an
+# older distribution's container than the CI job uses. See release.yml.
+#
+# Unlike the musl SDK, this cannot cross-compile: `--static-swift-stdlib` links
+# against the host's glibc, so each architecture is built on a native runner.
+# `package-linux-musl` covers hosts this artifact cannot serve.
+set -euo pipefail
+
+case "$(uname -m)" in
+  x86_64) arch="x86_64" ;;
+  aarch64 | arm64) arch="aarch64" ;;
+  *)
+    echo "unsupported architecture: $(uname -m)" >&2
+    exit 1
+    ;;
+esac
+triple="$arch-unknown-linux-gnu"
+
+# Only this variant's slice of dist/ is cleared; see the note in `package`. The
+# fragment is per-arch because the two slices are built on separate runners and
+# their outputs are merged only at publish time.
+rm -f "dist/SHA256SUMS.linux-gnu-$arch" "dist/sitrep-$triple.tar.gz"
+mkdir -p dist
+
+# -Xswiftc -static-stdlib works around swiftlang/swift-build#1764 on Swift 6.4.0.
+# Swift Build, the default backend, applies the static stdlib at link time but
+# compiles against the dynamic resource directory, so the object files never
+# request Foundation's ICU and CoreFoundation dependencies and the link dies on
+# undefined swift_u* ICU symbols. Passing -static-stdlib to the compile tasks too
+# is what the upstream fix (swiftlang/swift-build#1763) does. Once the toolchain
+# carries that fix the flag is redundant but harmless — drop it then.
+#
+# The alternative, --build-system native, also links, but that backend is
+# deprecated; this keeps the build on the supported one.
+#
+# -Xlinker --strip-debug drops DWARF but keeps the symbol table, so Swift crash
+# backtraces still name functions — the same shape as the macOS binary, which has
+# symbols but no embedded debug info. SwiftSyntax makes this binary large, and
+# statically linked debug info is most of what makes it larger.
+flags=(-c release --product sitrep --static-swift-stdlib -Xswiftc -static-stdlib
+  -Xlinker --strip-debug)
+swift build "${flags[@]}"
+bin="$(swift build "${flags[@]}" --show-bin-path)"
+# Diagnostic only, and not every image ships file(1) — never fail the build for it.
+command -v file >/dev/null 2>&1 && file "$bin/sitrep" || true
+ls -l "$bin/sitrep"
+
+# Fail rather than silently ship debug info again: the point of the flag is the
+# download size. The check needs readelf (binutils). It always says what it did,
+# because a silent skip is indistinguishable from a pass: where readelf is missing
+# it emits a GitHub Actions warning, which shows on the run's summary page.
+assert_no_debug_info() {
+  if ! command -v readelf >/dev/null 2>&1; then
+    echo "::warning::debug-info check skipped for $(basename "$1") — readelf not available"
+    return 0
+  fi
+  # Read the headers into a variable first: piping readelf into `grep -q` lets grep
+  # exit on the first match, readelf die of SIGPIPE, and pipefail turn a hit into a miss.
+  if grep -q '\.debug_info' <<<"$(readelf -S "$1")"; then
+    echo "debug info still present in $1 — --strip-debug did not take effect" >&2
+    exit 1
+  fi
+  echo "debug-info check passed: no .debug_info in $1 (readelf)"
+}
+assert_no_debug_info "$bin/sitrep"
+
+# gzip -n omits the timestamp/name so repeated packaging of the same binary is
+# byte-identical, matching how `package` builds its darwin archives.
+tar -cf - -C "$bin" sitrep | gzip -n > "dist/sitrep-$triple.tar.gz"
+# Hashed from inside dist/ so the entry is a bare filename; see the note in `package`.
+(cd dist && sha256sum "sitrep-$triple.tar.gz") | tee -a "dist/SHA256SUMS.linux-gnu-$arch"
+
+ls -l dist

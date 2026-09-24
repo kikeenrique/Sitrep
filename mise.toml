@@ -1,0 +1,14 @@
+# mise tasks for the sitrep CLI.
+# The packaging tasks live as file tasks under mise/tasks/, and the release CI
+# runs those same tasks — so a human and CI build byte-identical artifacts.
+
+[task_config]
+includes = ["mise/tasks"]
+
+[tasks.build]
+description = "Debug build"
+run = "swift build"
+
+[tasks.test]
+description = "Run tests"
+run = "swift test"
