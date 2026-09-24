@@ -21,7 +21,9 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-syntax.git", from: "602.0.0"),
-        .package(url: "https://github.com/jpsim/Yams.git", from: "6.0.0"),
+        // 6.2.2 is the first release that builds against the Static Linux SDK:
+        // earlier ones fail on an ambiguous DBL_DECIMAL_DIG (jpsim/Yams#477).
+        .package(url: "https://github.com/jpsim/Yams.git", from: "6.2.2"),
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.7.0"),
     ],
     targets: [
