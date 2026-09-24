@@ -24,14 +24,16 @@ Sitrep is built using Apple’s [SwiftSyntax](https://github.com/apple/swift-syn
 
 **Note:** Please make sure that the SwiftSyntax version specified in Package.swift matches your current Swift tools version.
 
+**About this fork:** this is a fork of [twostraws/Sitrep](https://github.com/twostraws/Sitrep) that adds Linux support and prebuilt release binaries for macOS and Linux. The installation instructions below install this fork's releases.
+
 
 ## Installation
 
-Sitrep runs on macOS and Linux. You can install a prebuilt binary, use [Homebrew](https://brew.sh) or [Mint](https://github.com/yonaskolb/Mint), or build it from source yourself.
+Sitrep runs on macOS and Linux. You can install a prebuilt binary, use [Mint](https://github.com/yonaskolb/Mint), or build it from source yourself.
 
 ### Prebuilt binaries
 
-Binaries are attached to each [GitHub release](https://github.com/twostraws/Sitrep/releases): a universal (arm64 + x86_64) macOS binary, and Linux binaries for x86_64 and aarch64 in two variants — `-gnu` for glibc distributions (Debian, Ubuntu, Fedora, RHEL and the rest), and `-musl` for Alpine, other musl distributions, and distroless images. All of them bundle the Swift runtime, so no toolchain is needed on the target machine.
+Binaries are attached to each [GitHub release](https://github.com/kikeenrique/Sitrep/releases): a universal (arm64 + x86_64) macOS binary, and Linux binaries for x86_64 and aarch64 in two variants — `-gnu` for glibc distributions (Debian, Ubuntu, Fedora, RHEL and the rest), and `-musl` for Alpine, other musl distributions, and distroless images. All of them bundle the Swift runtime, so no toolchain is needed on the target machine.
 
 Downloading by hand, take `-gnu` unless you know you are on musl:
 
@@ -40,23 +42,23 @@ tar -xzf sitrep-x86_64-unknown-linux-gnu.tar.gz
 install sitrep /usr/local/bin/sitrep
 ```
 
-Each release also ships a `SHA256SUMS` file to verify against.
+Each release also ships a `SHA256SUMS` file; run `sha256sum -c SHA256SUMS` next to the downloaded archives to verify them.
 
-### Homebrew
+With [mise](https://mise.jdx.dev), which picks the right archive for your platform:
 
 ```bash
-brew install twostraws/brew/sitrep
+mise use -g github:kikeenrique/Sitrep
 ```
 
-Using Homebrew allows you to run `sitrep` directly from the command line.
+The upstream Homebrew formula (`brew install twostraws/brew/sitrep`) installs the original project's release, which is macOS only and does not include this fork's changes.
 
 ### Mint
 
 Mint builds from source, and works on both macOS and Linux:
 
 ```bash
-mint install twostraws/Sitrep@main
-mint run sitrep@main
+mint install kikeenrique/Sitrep@main-release
+mint run sitrep@main-release
 ```
 
 ### Building it yourself
@@ -64,12 +66,12 @@ mint run sitrep@main
 Clone the repository and run `make install`:
 
 ```bash
-git clone https://github.com/twostraws/Sitrep
+git clone -b main-release https://github.com/kikeenrique/Sitrep
 cd Sitrep
 make install
 ```
 
-As with the Homebrew option, building the command line tool yourself allows you to use the `sitrep` command directly from the command line.
+Building the command line tool yourself allows you to use the `sitrep` command directly from the command line.
 
 ### Linux notes
 
@@ -87,7 +89,7 @@ First, add Sitrep as a dependency in your `Package.swift` file:
 let package = Package(
     //...
     dependencies: [
-        .package(url: "https://github.com/twostraws/Sitrep", .branch("main"))
+        .package(url: "https://github.com/kikeenrique/Sitrep", branch: "main-release")
     ],
     //...
 )
